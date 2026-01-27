@@ -4,7 +4,7 @@ internal class Program
 {
     static void Main(string[] args)
     {
-        Problem6Part2();
+        Problem7Part1();
     }
 
     #region Problem 1
@@ -798,6 +798,75 @@ internal class Program
         }
 
         Console.WriteLine($"Grand total: {grandTotal}");
+    }
+
+    #endregion
+
+    #region Problem 7
+
+    private static void Problem7Part1()
+    {
+        var fileName = "../../../../input/input-7.txt";
+        var lines = File.ReadLines(fileName).ToArray();
+
+        if (lines.Count() == 0)
+        {
+            Console.WriteLine("Empty input");
+            return;
+        }
+
+        var firstLine = lines.First();
+        var beamStartColumn = -1;
+        for (int i = 0; i < firstLine.Length; i++)
+        {
+            if (firstLine[i] == 'S')
+            {
+                beamStartColumn = i;
+                break;
+            }
+        }
+
+        if (beamStartColumn == -1)
+        {
+            Console.WriteLine("Input missing initial bean location");
+            return;
+        }
+
+        int splitCount = 0;
+        HashSet<int> previousRowBeamColumns = new();
+        previousRowBeamColumns.Add(beamStartColumn);
+        HashSet<int> currentRowBeamColumns = new();
+        for (int y = 1; y < lines.Count(); y++)
+        {
+            var currentLine = lines[y];
+            foreach (var previousRowBeamColumn in previousRowBeamColumns)
+            {
+                if (currentLine[previousRowBeamColumn] == '^')
+                {
+                    splitCount++;
+                    if (previousRowBeamColumn > 0)
+                    {
+                        currentRowBeamColumns.Add(previousRowBeamColumn - 1);
+                    }
+                    if (previousRowBeamColumn < currentLine.Length - 1)
+                    {
+                        currentRowBeamColumns.Add(previousRowBeamColumn + 1);
+                    }
+                }
+                else
+                {
+                    currentRowBeamColumns.Add(previousRowBeamColumn);
+                }
+            }
+
+            Console.WriteLine(currentLine);
+            Console.WriteLine(string.Join(',', currentRowBeamColumns));
+            previousRowBeamColumns.Clear();
+            previousRowBeamColumns.UnionWith(currentRowBeamColumns);
+            currentRowBeamColumns.Clear();
+        }
+
+        Console.WriteLine($"Split count: {splitCount}");
     }
 
     #endregion
