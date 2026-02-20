@@ -1,10 +1,12 @@
-﻿namespace advent_of_code_2025;
+﻿using System.Diagnostics.CodeAnalysis;
+
+namespace advent_of_code_2025;
 
 internal class Program
 {
     static void Main(string[] args)
     {
-        Problem8Part2();
+        Problem9Part1();
     }
 
     #region Problem 1
@@ -1284,6 +1286,76 @@ internal class Program
 
             Console.WriteLine("--------------------------------------");
         }
+    }
+
+    #endregion
+
+
+    #region Problem 9
+
+    private struct TileLocation : IEquatable<TileLocation>
+    {
+        public int x;
+        public int y;
+
+        public TileLocation(int  x, int y)
+        {
+            this.x = x;
+            this.y = y;
+        }
+
+        public bool Equals(TileLocation other)
+        {
+            return this.x == other.x && this.y == other.y;
+        }
+
+        public override int GetHashCode()
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    private static void Problem9Part1()
+    {
+        var fileName = "../../../../input/input-9.txt";
+        var lines = File.ReadLines(fileName).ToArray();
+
+        if (lines.Count() == 0)
+        {
+            Console.WriteLine("Empty input");
+            return;
+        }
+
+        // Parse all the red tile locations
+        List<TileLocation> tileLocations = new();
+        foreach(var line in lines)
+        {
+            var tokens = line.Split(',');
+            var x = int.Parse(tokens[0]);
+            var y = int.Parse(tokens[1]);
+
+            tileLocations.Add(new TileLocation(x, y));
+        }
+
+        long maxArea = long.MinValue;
+        foreach (var tileA in tileLocations)
+        {
+            foreach (var tileB in tileLocations)
+            {
+                if (tileA.Equals(tileB))
+                {
+                    continue;
+                }
+
+                var area = ((long)Math.Abs(tileA.x - tileB.x) + 1) * ((long)Math.Abs(tileA.y - tileB.y) + 1);
+                if (area > maxArea)
+                {
+                    maxArea = area;
+                }
+            }
+        }
+
+        Console.WriteLine($"Result: {maxArea}");
     }
 
     #endregion
