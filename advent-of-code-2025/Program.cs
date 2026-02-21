@@ -1399,7 +1399,7 @@ internal class Program
         public uint GetValue(int x, int y)
         {
             // Turn input coordinates into 1D
-            var position1D = y * _width + x;
+            var position1D = (long)y * _width + x;
 
             // Turn 1D position into packed space
             var packedY = position1D / 16;
@@ -1411,8 +1411,8 @@ internal class Program
             var packedXBit2 = packedXBit1 + 1;
 
             // Get the bits
-            var bit1 = GetNthBit(packedData, packedXBit1);
-            var bit2 = GetNthBit(packedData, packedXBit2);
+            var bit1 = GetNthBit(packedData, (int)packedXBit1);
+            var bit2 = GetNthBit(packedData, (int)packedXBit2);
 
             // Turn the bits into a single return value
             var value = bit1 * 2 + bit2;
