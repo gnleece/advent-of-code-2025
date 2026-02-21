@@ -6,7 +6,7 @@ internal class Program
 {
     static void Main(string[] args)
     {
-        Problem10Part1();
+        Problem10Part2();
     }
 
     #region Problem 1
@@ -1738,6 +1738,62 @@ internal class Program
             }
             return hashCode.ToHashCode();
         }
+
+        public string DebugString => string.Join(",", Buttons);
+    }
+
+    public struct JoltageRequirements
+    {
+        public List<int> Joltages;
+
+        public JoltageRequirements(List<int> joltages)
+        {
+            Joltages = joltages;
+        }
+
+        public JoltageRequirements DeepCopy()
+        {
+            var newList = new List<int>(Joltages);
+            return new JoltageRequirements(newList);
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = new HashCode();
+            foreach (var item in Joltages)
+            {
+                hashCode.Add(item);
+            }
+            return hashCode.ToHashCode();
+        }
+
+        public void ApplyButtonPresses(ButtonWiring buttonWiring)
+        {
+            foreach (var button in buttonWiring.Buttons)
+            {
+                Joltages[button]++;
+            }
+        }
+
+        public bool Equals(JoltageRequirements other)
+        {
+            if (other.Joltages.Count != Joltages.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < Joltages.Count; i++)
+            {
+                if (other.Joltages[i] != Joltages[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public string DebugString => String.Join(",", Joltages);
     }
 
     private static void Problem10Part1()
@@ -1810,6 +1866,78 @@ internal class Program
             }
 
             var minNumPushes = GetMinNumberOfPushesToReachState(targetLightDiagram, buttonWirings);
+            Console.WriteLine($"Min pushes: {minNumPushes}");
+            totalNumPushes += minNumPushes;
+        }
+
+        Console.WriteLine($"RESULT: Total num pushes = {totalNumPushes}");
+    }
+
+    private static void Problem10Part2()
+    {
+        var fileName = "../../../../input/input-10-example.txt";
+        var lines = File.ReadLines(fileName).ToArray();
+
+        if (lines.Count() == 0)
+        {
+            Console.WriteLine("Empty input");
+            return;
+        }
+
+        long totalNumPushes = 0;
+
+        foreach (var line in lines)
+        {
+            var tokens = line.Split(' ');
+            var lightDiagreamString = tokens[0];
+            List<string> buttonWiringStrings = new();
+            string joltageString = "";
+            for (int i = 1; i < tokens.Length; i++)
+            {
+                var token = tokens[i];
+                if (token.StartsWith('('))
+                {
+                    buttonWiringStrings.Add(token);
+                }
+                else if (token.StartsWith('{'))
+                {
+                    if (i != tokens.Length - 1)
+                    {
+                        Console.WriteLine("Error: unexpected input string");
+                        return;
+                    }
+                    joltageString = token;
+                }
+            }
+
+            // Parse the button wirings
+            List<ButtonWiring> buttonWirings = new();
+            foreach (var buttonWiringString in buttonWiringStrings)
+            {
+                HashSet<int> buttons = new();
+                var strippedString = buttonWiringString.Replace("(", "");
+                strippedString = strippedString.Replace(")", "");
+                var wiringTokens = strippedString.Split(",");
+                foreach (var wiringToken in wiringTokens)
+                {
+                    buttons.Add(int.Parse(wiringToken));
+                }
+                var buttonWiring = new ButtonWiring(buttons);
+                buttonWirings.Add(buttonWiring);
+            }
+
+            // Parse the joltage requirements
+            var strippedJoltageString = joltageString.Replace("{", "");
+            strippedJoltageString = strippedJoltageString.Replace("}", "");
+            var joltageTokens = strippedJoltageString.Split(",");
+            List<int> joltageList = new();
+            foreach (var  joltageToken in joltageTokens)
+            {
+                joltageList.Add(int.Parse(joltageToken));
+            }
+            JoltageRequirements joltageRequirements = new JoltageRequirements(joltageList);
+
+            var minNumPushes = GetMinNumberOfPushesToReachJoltage(joltageRequirements, buttonWirings);
             Console.WriteLine($"Min pushes: {minNumPushes}");
             totalNumPushes += minNumPushes;
         }
@@ -1903,6 +2031,155 @@ internal class Program
             else
             {
                 visitedNodes[currentState.StateString].Add(buttonWiring);
+            }
+        }
+    }
+
+    private static int GetMinNumberOfPushesToReachJoltage(JoltageRequirements targetState, List<ButtonWiring> buttonWirings)
+    {
+        var numJoltages = targetState.Joltages.Count;
+        var initialState = new JoltageRequirements(Enumerable.Repeat(0, numJoltages).ToList());
+
+        if (initialState.Equals(targetState))
+        {
+            return 0;
+        }
+
+        Dictionary<JoltageRequirements, HashSet<ButtonWiring>> visitedNodes = new();
+
+        Queue<JoltageSearchNode> searchNodes = new();
+        AddJoltageButtonWiringsToQueue(searchNodes, 1, initialState, targetState, buttonWirings, visitedNodes);
+
+        while (searchNodes.Count > 0)
+        {
+            //Console.WriteLine($"Dequeing. Queue size: {searchNodes.Count} -------------------------------------");
+            var node = searchNodes.Dequeue();
+
+            if (searchNodes.Count % 10000 == 0)
+            {
+                Console.WriteLine($"Queue size: {searchNodes.Count}, current depth = {node.Depth}");
+            }
+
+            //Console.WriteLine($"Testing node: {node.DebugString}");
+
+            //Console.WriteLine($"... old state: {node.CurrentState.StateString}");
+            var newState = node.CurrentState.DeepCopy();
+            newState.ApplyButtonPresses(node.ButtonWiring);
+            //Console.WriteLine($"... new state: {newState.StateString}");
+            if (newState.Equals(targetState))
+            {
+                return node.Depth;
+            }
+            AddJoltageButtonWiringsToQueue(searchNodes, node.Depth + 1, newState, targetState, buttonWirings, visitedNodes);
+        }
+
+        Console.WriteLine("Error: unable to find press count");
+        return -1;
+    }
+
+    private struct JoltageSearchNode
+    {
+        public int Depth;
+        public JoltageRequirements CurrentState;
+        public ButtonWiring ButtonWiring;
+
+        public int[] CumulativePresses;
+
+        public string DebugString
+        {
+            get
+            {
+                var buttonString = string.Join(",", ButtonWiring.Buttons);
+                return $"Depth = {Depth}, State = {CurrentState.DebugString}, Buttons = {buttonString}";
+            }
+        }
+    }
+
+    private static void AddJoltageButtonWiringsToQueue(
+        Queue<JoltageSearchNode> searchNodes,
+        int depth,
+        JoltageRequirements currentState,
+        JoltageRequirements targetState,
+        List<ButtonWiring> buttonWirings,
+        Dictionary<JoltageRequirements, HashSet<ButtonWiring>> visitedNodes)
+    {
+        foreach (var buttonWiring in buttonWirings)
+        {
+            /*
+            if (depth <= 3)
+            {
+                Console.WriteLine("--------------------------------------");
+                Console.WriteLine($"currentState = {currentState.DebugString}, hash code = {currentState.GetHashCode()}");
+                Console.WriteLine($"current wiring: {buttonWiring.DebugString}, hash code = {buttonWiring.GetHashCode()}");
+                Console.WriteLine("visited nodes dict:");
+            }
+            */
+                foreach (var key in visitedNodes.Keys)
+                {
+                    //Console.WriteLine($"... {key.DebugString} {key.GetHashCode()}");
+                    if (key.GetHashCode() == currentState.GetHashCode())
+                    {
+                        //Console.WriteLine("KEY HASH CODE MATCH");
+                        var matchingValue = visitedNodes[key];
+                        //Console.WriteLine($"matching value: {matchingValue}");
+
+                        if (matchingValue.Contains(buttonWiring))
+                        {
+                            //Console.WriteLine("Skipped previously visited node???????????????????????????");
+                            continue;
+                        }
+                    }
+                }
+            
+
+            // Check whether we've already explored this node
+            if (visitedNodes.ContainsKey(currentState))
+            {
+                var buttonWiringSet = visitedNodes[currentState];
+
+                /*
+                if (depth <= 3)
+                {
+                    Console.WriteLine($"State key found!");
+                    Console.WriteLine("visited wirings:");
+                    foreach (var bw in buttonWiringSet)
+                    {
+                        Console.WriteLine($"... {bw.DebugString}, hash = {bw.GetHashCode()}");
+                    }
+                }
+                */
+                if (buttonWiringSet.Contains(buttonWiring))
+                {
+                    Console.WriteLine("Skipped previously visited node!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    continue;
+                }
+            }
+            else
+            {
+                if (depth <= 3) Console.WriteLine($"key not found");
+            }
+
+            // Check whether any of the joltages in this state are already above the target
+            // If so, this node is invalid since the joltages can never go back down
+            for (int i = 0; i < currentState.Joltages.Count; i++)
+            {
+                if (currentState.Joltages[i] > targetState.Joltages[i])
+                {
+                    //Console.WriteLine("Skipped node with overflowed state");
+                    continue;
+                }
+            }
+
+            var node = new JoltageSearchNode { Depth = depth, CurrentState = currentState, ButtonWiring = buttonWiring };
+            searchNodes.Enqueue(node);
+
+            if (!visitedNodes.ContainsKey(currentState))
+            {
+                visitedNodes.Add(currentState, new HashSet<ButtonWiring> { buttonWiring });
+            }
+            else
+            {
+                visitedNodes[currentState].Add(buttonWiring);
             }
         }
     }
