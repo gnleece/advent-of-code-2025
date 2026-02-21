@@ -6,7 +6,7 @@ internal class Program
 {
     static void Main(string[] args)
     {
-        Problem9Part2();
+        Problem10Part1();
     }
 
     #region Problem 1
@@ -1290,7 +1290,6 @@ internal class Program
 
     #endregion
 
-
     #region Problem 9
 
     private struct TileLocation : IEquatable<TileLocation>
@@ -1673,5 +1672,239 @@ internal class Program
         return true;
     }
 
+    #endregion
+
+    #region Problem 10
+
+    public struct IndicatorLightDiagram : IEquatable<IndicatorLightDiagram>
+    {
+        public List<bool> LightStates;
+
+        public IndicatorLightDiagram(List<bool> lightStates)
+        {
+            LightStates = lightStates;
+        }
+
+        public bool Equals(IndicatorLightDiagram other)
+        {
+            if (other.LightStates.Count != LightStates.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < LightStates.Count; i++)
+            {
+                if (other.LightStates[i] != LightStates[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public void ApplyButtonPresses(ButtonWiring buttonWiring)
+        {
+            foreach(var button in buttonWiring.Buttons)
+            {
+                LightStates[button] = !LightStates[button];
+            }
+        }
+
+        public IndicatorLightDiagram DeepCopy()
+        {
+            var newList = new List<bool>(LightStates);
+            return new IndicatorLightDiagram(newList);
+        }
+
+        public string StateString => string.Join("", LightStates.Select(x => x ? "1" : "0"));
+    }
+
+    public struct ButtonWiring
+    {
+        public HashSet<int> Buttons;
+
+        public ButtonWiring(HashSet<int> buttons)
+        {
+            Buttons = buttons;
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = new HashCode();
+            foreach (var item in Buttons)
+            {
+                hashCode.Add(item);
+            }
+            return hashCode.ToHashCode();
+        }
+    }
+
+    private static void Problem10Part1()
+    {
+        var fileName = "../../../../input/input-10.txt";
+        var lines = File.ReadLines(fileName).ToArray();
+
+        if (lines.Count() == 0)
+        {
+            Console.WriteLine("Empty input");
+            return;
+        }
+
+        long totalNumPushes = 0;
+
+        foreach (var line in lines)
+        {
+            var tokens = line.Split(' ');
+            var lightDiagreamString = tokens[0];
+            List<string> buttonWiringStrings = new();
+            string joltageString = "";
+            for (int i = 1; i < tokens.Length; i++)
+            {
+                var token = tokens[i];
+                if (token.StartsWith('('))
+                {
+                    buttonWiringStrings.Add(token);
+                }
+                else if (token.StartsWith('{'))
+                {
+                    if (i != tokens.Length - 1)
+                    {
+                        Console.WriteLine("Error: unexpected input string");
+                        return;
+                    }
+                    joltageString = token;
+                }
+            }
+
+            // Parse the machine indicator light diagram
+            List<bool> targetLightState = new();
+            foreach (var character in lightDiagreamString)
+            {
+                if (character == '.')
+                {
+                    targetLightState.Add(false);
+                }
+                else if (character == '#')
+                {
+                    targetLightState.Add(true);
+                }
+            }
+            IndicatorLightDiagram targetLightDiagram = new IndicatorLightDiagram(targetLightState);
+
+
+            // Parse the button wirings
+            List<ButtonWiring> buttonWirings = new();
+            foreach(var buttonWiringString in buttonWiringStrings)
+            {
+                HashSet<int> buttons = new();
+                var strippedString = buttonWiringString.Replace("(", "");
+                strippedString = strippedString.Replace(")", "");
+                var wiringTokens = strippedString.Split(",");
+                foreach (var wiringToken in wiringTokens)
+                {
+                    buttons.Add(int.Parse(wiringToken));
+                }
+                var buttonWiring = new ButtonWiring(buttons);
+                buttonWirings.Add(buttonWiring);
+            }
+
+            var minNumPushes = GetMinNumberOfPushesToReachState(targetLightDiagram, buttonWirings);
+            Console.WriteLine($"Min pushes: {minNumPushes}");
+            totalNumPushes += minNumPushes;
+        }
+
+        Console.WriteLine($"RESULT: Total num pushes = {totalNumPushes}");
+    }
+
+    private struct SearchNode
+    {
+        public int Depth;
+        public IndicatorLightDiagram CurrentState;
+        public ButtonWiring ButtonWiring;
+
+        public string DebugString
+        {
+            get
+            {
+                var buttonString = string.Join(",", ButtonWiring.Buttons);
+                return $"Depth = {Depth}, State = {CurrentState.StateString}, Buttons = {buttonString}";
+            }
+        }
+    }
+
+    private static int GetMinNumberOfPushesToReachState(IndicatorLightDiagram targetState, List<ButtonWiring> buttonWirings)
+    {
+        var numLights = targetState.LightStates.Count;
+        var initialState = new IndicatorLightDiagram(Enumerable.Repeat(false, numLights).ToList());
+
+        if (initialState.Equals(targetState))
+        {
+            return 0;
+        }
+
+        Dictionary<string, HashSet<ButtonWiring>> visitedNodes = new();
+
+        Queue<SearchNode> searchNodes = new();
+        AddButtonWiringsToQueue(searchNodes, 1, initialState, buttonWirings, visitedNodes);
+
+        while (searchNodes.Count > 0)
+        {
+            //Console.WriteLine($"Dequeing. Queue size: {searchNodes.Count} -------------------------------------");
+            var node = searchNodes.Dequeue();
+
+            if (searchNodes.Count % 10000 == 0)
+            {
+                Console.WriteLine($"Queue size: {searchNodes.Count}, current depth = {node.Depth}");
+            }
+
+            //Console.WriteLine($"Testing node: {node.DebugString}");
+
+            //Console.WriteLine($"... old state: {node.CurrentState.StateString}");
+            var newState = node.CurrentState.DeepCopy();
+            newState.ApplyButtonPresses(node.ButtonWiring);
+            //Console.WriteLine($"... new state: {newState.StateString}");
+            if (newState.Equals(targetState))
+            {
+                return node.Depth;
+            }
+            AddButtonWiringsToQueue(searchNodes, node.Depth + 1, newState, buttonWirings, visitedNodes);
+        }
+
+        Console.WriteLine("Error: unable to find press count");
+        return -1;
+    }
+
+    private static void AddButtonWiringsToQueue(
+        Queue<SearchNode> searchNodes,
+        int depth,
+        IndicatorLightDiagram currentState,
+        List<ButtonWiring> buttonWirings,
+        Dictionary<string, HashSet<ButtonWiring>> visitedNodes)
+    {
+        foreach (var buttonWiring in buttonWirings)
+        {
+            // Check whether we've already explored this node
+            if (visitedNodes.TryGetValue(currentState.StateString, out var buttonWiringsSet))
+            {
+                if (buttonWiringsSet.Contains(buttonWiring))
+                {
+                    continue;
+                }
+            }
+
+            var node = new SearchNode { Depth = depth, CurrentState = currentState, ButtonWiring = buttonWiring };
+            searchNodes.Enqueue(node);
+
+            if (!visitedNodes.ContainsKey(currentState.StateString))
+            {
+                visitedNodes.Add(currentState.StateString, new HashSet<ButtonWiring> { buttonWiring });
+            }
+            else
+            {
+                visitedNodes[currentState.StateString].Add(buttonWiring);
+            }
+        }
+    }
     #endregion
 }
