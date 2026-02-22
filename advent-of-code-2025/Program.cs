@@ -1706,9 +1706,12 @@ internal class Program
 
         public void ApplyButtonPresses(ButtonWiring buttonWiring)
         {
-            foreach(var button in buttonWiring.Buttons)
+            for (int i = 0; i < buttonWiring.Buttons.Length; i++)
             {
-                LightStates[button] = !LightStates[button];
+                if (buttonWiring.Buttons[i] == 1)
+                {
+                    LightStates[i] = !LightStates[i];
+                }
             }
         }
 
@@ -1721,31 +1724,13 @@ internal class Program
         public string StateString => string.Join("", LightStates.Select(x => x ? "1" : "0"));
     }
 
-    public struct ButtonWiring
+    public class ButtonWiring
     {
-        public HashSet<int> Buttons;
+        public int[] Buttons;
 
-        private int _hashCode = 0;
-
-        public ButtonWiring(HashSet<int> buttons)
+        public ButtonWiring(int[] buttons)
         {
             Buttons = buttons;
-            _hashCode = ComputeHashCode();
-        }
-
-        public override int GetHashCode()
-        {
-            return _hashCode;
-        }
-
-        private int ComputeHashCode()
-        {
-            var hashCode = new HashCode();
-            foreach (var item in Buttons)
-            {
-                hashCode.Add(item);
-            }
-            return hashCode.ToHashCode();
         }
 
         public string DebugString => string.Join(",", Buttons);
@@ -1790,9 +1775,12 @@ internal class Program
         public static JoltageRequirements ApplyButtonPresses(JoltageRequirements initialState, ButtonWiring buttonWiring)
         {
             var newJoltages = new List<int>(initialState.Joltages);
-            foreach (var button in buttonWiring.Buttons)
+            for (int i = 0; i < buttonWiring.Buttons.Length; i++)
             {
-                newJoltages[button]++;
+                if (buttonWiring.Buttons[i] == 1)
+                {
+                    newJoltages[i]++;
+                }
             }
             return new JoltageRequirements(newJoltages);
         }
@@ -1875,13 +1863,19 @@ internal class Program
             List<ButtonWiring> buttonWirings = new();
             foreach(var buttonWiringString in buttonWiringStrings)
             {
-                HashSet<int> buttons = new();
+                int[] buttons = new int[targetLightState.Count];
                 var strippedString = buttonWiringString.Replace("(", "");
                 strippedString = strippedString.Replace(")", "");
                 var wiringTokens = strippedString.Split(",");
                 foreach (var wiringToken in wiringTokens)
                 {
-                    buttons.Add(int.Parse(wiringToken));
+                    var index = int.Parse(wiringToken);
+                    if (index < 0 || index >= targetLightState.Count)
+                    {
+                        Console.WriteLine($"Error: button wiring index {index} is out of bounds for number of machines {targetLightState.Count}");
+                        return;
+                    }
+                    buttons[index] = 1;
                 }
                 var buttonWiring = new ButtonWiring(buttons);
                 buttonWirings.Add(buttonWiring);
@@ -1897,7 +1891,7 @@ internal class Program
 
     private static void Problem10Part2()
     {
-        var fileName = "../../../../input/input-10.txt";
+        var fileName = "../../../../input/input-10-example.txt";
         var lines = File.ReadLines(fileName).ToArray();
 
         if (lines.Count() == 0)
@@ -1907,6 +1901,7 @@ internal class Program
         }
 
         long totalNumPushes = 0;
+        int testCaseNumber = 1;
 
         foreach (var line in lines)
         {
@@ -1932,36 +1927,45 @@ internal class Program
                 }
             }
 
-            // Parse the button wirings
-            List<ButtonWiring> buttonWirings = new();
-            foreach (var buttonWiringString in buttonWiringStrings)
-            {
-                HashSet<int> buttons = new();
-                var strippedString = buttonWiringString.Replace("(", "");
-                strippedString = strippedString.Replace(")", "");
-                var wiringTokens = strippedString.Split(",");
-                foreach (var wiringToken in wiringTokens)
-                {
-                    buttons.Add(int.Parse(wiringToken));
-                }
-                var buttonWiring = new ButtonWiring(buttons);
-                buttonWirings.Add(buttonWiring);
-            }
-
             // Parse the joltage requirements
             var strippedJoltageString = joltageString.Replace("{", "");
             strippedJoltageString = strippedJoltageString.Replace("}", "");
             var joltageTokens = strippedJoltageString.Split(",");
             List<int> joltageList = new();
-            foreach (var  joltageToken in joltageTokens)
+            foreach (var joltageToken in joltageTokens)
             {
                 joltageList.Add(int.Parse(joltageToken));
             }
             JoltageRequirements joltageRequirements = new JoltageRequirements(joltageList);
 
-            var minNumPushes = GetMinNumberOfPushesToReachJoltage(joltageRequirements, buttonWirings);
+            var numMachines = joltageRequirements.Joltages.Count;
+
+            // Parse the button wirings
+            List<ButtonWiring> buttonWirings = new();
+            foreach (var buttonWiringString in buttonWiringStrings)
+            {
+                int[] buttons = new int[numMachines];
+                var strippedString = buttonWiringString.Replace("(", "");
+                strippedString = strippedString.Replace(")", "");
+                var wiringTokens = strippedString.Split(",");
+                foreach (var wiringToken in wiringTokens)
+                {
+                    var index = int.Parse(wiringToken);
+                    if (index < 0 || index >= numMachines)
+                    {
+                        Console.WriteLine($"Error: button wiring index {index} is out of bounds for number of machines {numMachines}");
+                        return;
+                    }
+                    buttons[index] = 1;
+                }
+                var buttonWiring = new ButtonWiring(buttons);
+                buttonWirings.Add(buttonWiring);
+            }
+
+            var minNumPushes = GetMinNumberOfPushesToReachJoltage(joltageRequirements, buttonWirings, testCaseNumber);
             Console.WriteLine($"Min pushes: {minNumPushes}");
             totalNumPushes += minNumPushes;
+            testCaseNumber++;
         }
 
         Console.WriteLine($"RESULT: Total num pushes = {totalNumPushes}");
@@ -2052,7 +2056,7 @@ internal class Program
         }
     }
 
-    private static int GetMinNumberOfPushesToReachJoltage(JoltageRequirements targetState, List<ButtonWiring> buttonWirings)
+    private static int GetMinNumberOfPushesToReachJoltage(JoltageRequirements targetState, List<ButtonWiring> buttonWirings, int testCaseNumber)
     {
         var numJoltages = targetState.Joltages.Count;
         var initialState = new JoltageRequirements(Enumerable.Repeat(0, numJoltages).ToList());
@@ -2080,7 +2084,7 @@ internal class Program
 
             if (debugPrintStopwatch.ElapsedMilliseconds > debugUpdateIntervalms)
             {
-                Console.WriteLine($"Queue size: {searchNodes.Count}, current depth = {node.Depth}");
+                Console.WriteLine($"[Test {testCaseNumber}] Queue size: {searchNodes.Count}, current depth: {node.Depth}, elapsed time: {totalStopwatch.Elapsed.TotalSeconds}");
                 debugPrintStopwatch.Restart();
             }
 
@@ -2108,8 +2112,6 @@ internal class Program
         public int Depth;
         public JoltageRequirements CurrentState;
         public ButtonWiring ButtonWiring;
-
-        public int[] CumulativePresses;
 
         public string DebugString
         {
