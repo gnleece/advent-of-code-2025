@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using static advent_of_code_2025.Program;
 
 namespace advent_of_code_2025;
 
@@ -7,7 +8,7 @@ internal class Program
 {
     static void Main(string[] args)
     {
-        Problem10Part2();
+        Problem10Part2VersionB();
     }
 
     #region Problem 1
@@ -2173,5 +2174,260 @@ internal class Program
             searchNodes.Enqueue(node);
         }
     }
+    #endregion
+
+    #region Problem 10 version B
+
+    private static void Problem10Part2VersionB()
+    {
+        var fileName = "../../../../input/input-10.txt";
+        var lines = File.ReadLines(fileName).ToArray();
+
+        if (lines.Count() == 0)
+        {
+            Console.WriteLine("Empty input");
+            return;
+        }
+
+        long totalNumPushes = 0;
+        int testCaseNumber = 1;
+
+        foreach (var line in lines)
+        {
+            var tokens = line.Split(' ');
+            var lightDiagreamString = tokens[0];
+            List<string> buttonWiringStrings = new();
+            string joltageString = "";
+            for (int i = 1; i < tokens.Length; i++)
+            {
+                var token = tokens[i];
+                if (token.StartsWith('('))
+                {
+                    buttonWiringStrings.Add(token);
+                }
+                else if (token.StartsWith('{'))
+                {
+                    if (i != tokens.Length - 1)
+                    {
+                        Console.WriteLine("Error: unexpected input string");
+                        return;
+                    }
+                    joltageString = token;
+                }
+            }
+
+            // Parse the joltage requirements
+            var strippedJoltageString = joltageString.Replace("{", "");
+            strippedJoltageString = strippedJoltageString.Replace("}", "");
+            var joltageTokens = strippedJoltageString.Split(",");
+            var numMachines = joltageTokens.Length;
+            int[] targetJoltageArray = new int[numMachines];
+            for (int i = 0; i  < numMachines; i++)
+            {
+                targetJoltageArray[i] = int.Parse(joltageTokens[i]);
+            }
+            JoltageVector targetVector = new JoltageVector(targetJoltageArray);
+
+            // Parse the button wirings
+            List<JoltageVector> buttonVectors = new();
+            foreach (var buttonWiringString in buttonWiringStrings)
+            {
+                int[] buttonVectorArray = new int[numMachines];
+                var strippedString = buttonWiringString.Replace("(", "");
+                strippedString = strippedString.Replace(")", "");
+                var wiringTokens = strippedString.Split(",");
+                foreach (var wiringToken in wiringTokens)
+                {
+                    var index = int.Parse(wiringToken);
+                    if (index < 0 || index >= numMachines)
+                    {
+                        Console.WriteLine($"Error: button wiring index {index} is out of bounds for number of machines {numMachines}");
+                        return;
+                    }
+                    buttonVectorArray[index] = 1;
+                }
+                var buttonVector = new JoltageVector(buttonVectorArray);
+                buttonVectors.Add(buttonVector);
+            }
+
+            var minNumPushes = GetMinNumberOfPushesToReachJoltageV2(targetVector, buttonVectors, testCaseNumber);
+            Console.WriteLine($"Min pushes: {minNumPushes}");
+            totalNumPushes += minNumPushes;
+            testCaseNumber++;
+        }
+
+        Console.WriteLine($"RESULT: Total num pushes = {totalNumPushes}");
+    }
+
+    private static int GetMinNumberOfPushesToReachJoltageV2(JoltageVector targetStateVector, List<JoltageVector> buttonVectors, int testCaseNumber)
+    {
+        int maxButtonVectorSize = buttonVectors.Max(v => v.Size);
+        int minPossiblePushes = (int)Math.Ceiling((double)targetStateVector.Size / maxButtonVectorSize);
+
+        var stateVectorLength = targetStateVector.JoltageValues.Length;
+        var initialStateVector = new JoltageVector(new int[stateVectorLength]);
+
+        if (initialStateVector.Equals(targetStateVector))
+        {
+            return 0;
+        }
+
+        var numButtonWeights = buttonVectors.Count();
+        int[] initialButtonWeights = new int[numButtonWeights];
+
+        Queue<JoltageSearchNodeV2> searchNodes = new();
+        searchNodes.Enqueue(new JoltageSearchNodeV2(initialButtonWeights));
+
+        HashSet<JoltageVector> visitedStateVectors = new();
+
+        Stopwatch totalStopwatch = new Stopwatch();
+        Stopwatch debugPrintStopwatch = new Stopwatch();
+        totalStopwatch.Start();
+        debugPrintStopwatch.Start();
+
+        var debugUpdateIntervalms = 1000;
+
+        while (searchNodes.Count > 0)
+        {
+            var node = searchNodes.Dequeue();
+
+            if (debugPrintStopwatch.ElapsedMilliseconds > debugUpdateIntervalms)
+            {
+                Console.WriteLine($"[Test {testCaseNumber}] Queue size: {searchNodes.Count}, current depth: {node.Depth}, elapsed time: {totalStopwatch.Elapsed.TotalSeconds}");
+                debugPrintStopwatch.Restart();
+            }
+
+
+            var newStateVector = node.ApplyWeightsToButtonVectors(buttonVectors);
+            if (node.Depth >= minPossiblePushes && newStateVector.Equals(targetStateVector))
+            {
+                totalStopwatch.Stop();
+                Console.WriteLine($"Done. Total elapsed time: {totalStopwatch.Elapsed.TotalSeconds} seconds");
+                return node.Depth;
+            }
+
+            if (!visitedStateVectors.Contains(newStateVector))
+            {
+                AddChildSearchNodesToQueue(searchNodes, node.VectorWeights);
+                visitedStateVectors.Add(newStateVector);
+            }
+        }
+
+        Console.WriteLine("Error: unable to find push count");
+        return -1;
+    }
+
+    private static void AddChildSearchNodesToQueue(
+        Queue<JoltageSearchNodeV2> searchNodes,
+        int[] vectorWeights)
+    {
+        for (int i = 0; i < vectorWeights.Length; i++)
+        {
+            int[] clonedArray = (int[])vectorWeights.Clone();
+            clonedArray[i]++;
+            var searchNode = new JoltageSearchNodeV2(clonedArray);
+            searchNodes.Enqueue(searchNode);
+        }
+    }
+
+    public class JoltageSearchNodeV2
+    {
+        public int[] VectorWeights;
+        public int Depth;
+
+        public JoltageSearchNodeV2(int[] vectorWeights)
+        {
+            VectorWeights = vectorWeights;
+            Depth = VectorWeights.Sum();
+        }
+
+        public JoltageVector ApplyWeightsToButtonVectors(List<JoltageVector> buttonVectors)
+        {
+            var resultArray = new int[buttonVectors[0].JoltageValues.Length];
+            for (int i = 0; i < buttonVectors.Count; i++)
+            {
+                var buttonVector = buttonVectors[i];
+                var weight = VectorWeights[i];
+                for (int j = 0; j < buttonVector.JoltageValues.Length; j++)
+                {
+                    resultArray[j] += buttonVector.JoltageValues[j] * weight;
+                }
+            }
+            return new JoltageVector(resultArray);
+        }
+
+        public string DebugString
+        {
+            get
+            {
+                var weightString = string.Join(",", VectorWeights);
+                return $"Weights: [{weightString}]";
+            }
+        }
+    }
+
+    public struct JoltageVector : IEquatable<JoltageVector>
+    {
+        public readonly int[] JoltageValues;
+
+        private int _hashCode = 0;
+
+        public JoltageVector(int[] joltageValues)
+        {
+            JoltageValues = joltageValues;
+            _size = joltageValues != null ? joltageValues.Sum() : 0;
+            _hashCode = ComputeHashCode();
+        }
+
+        private int _size;
+        public int Size => _size;
+
+        public override int GetHashCode()
+        {
+            return _hashCode;
+        }
+
+        private int ComputeHashCode()
+        {
+            var hashCode = new HashCode();
+            foreach (var item in JoltageValues)
+            {
+                hashCode.Add(item);
+            }
+            return hashCode.ToHashCode();
+        }
+
+        public override bool Equals(object? obj) => obj is JoltageRequirements other && Equals(other);
+
+        public bool Equals(JoltageVector other)
+        {
+            if (JoltageValues == null && other.JoltageValues == null)
+            {
+                return true;
+            }
+            else if (JoltageValues == null || other.JoltageValues == null)
+            {
+                return false;
+            }
+
+            if (other.JoltageValues.Count() != JoltageValues.Count())
+            {
+                return false;
+            }
+
+            for (int i = 0; i < JoltageValues.Count(); i++)
+            {
+                if (other.JoltageValues[i] != JoltageValues[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public string DebugString => String.Join(",", JoltageValues);
+    }
+
     #endregion
 }
