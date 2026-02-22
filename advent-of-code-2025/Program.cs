@@ -1725,12 +1725,20 @@ internal class Program
     {
         public HashSet<int> Buttons;
 
+        private int _hashCode = 0;
+
         public ButtonWiring(HashSet<int> buttons)
         {
             Buttons = buttons;
+            _hashCode = ComputeHashCode();
         }
 
         public override int GetHashCode()
+        {
+            return _hashCode;
+        }
+
+        private int ComputeHashCode()
         {
             var hashCode = new HashCode();
             foreach (var item in Buttons)
@@ -1889,7 +1897,7 @@ internal class Program
 
     private static void Problem10Part2()
     {
-        var fileName = "../../../../input/input-10-example.txt";
+        var fileName = "../../../../input/input-10.txt";
         var lines = File.ReadLines(fileName).ToArray();
 
         if (lines.Count() == 0)
@@ -2054,10 +2062,10 @@ internal class Program
             return 0;
         }
 
-        Dictionary<JoltageRequirements, HashSet<ButtonWiring>> visitedNodes = new();
+        HashSet<JoltageRequirements> visitedStates = new();
 
         Queue<JoltageSearchNode> searchNodes = new();
-        AddJoltageButtonWiringsToQueue(searchNodes, 1, initialState, targetState, buttonWirings, visitedNodes);
+        AddJoltageButtonWiringsToQueue(searchNodes, 1, initialState, targetState, buttonWirings);
 
         Stopwatch totalStopwatch = new Stopwatch();
         totalStopwatch.Start();
@@ -2084,7 +2092,11 @@ internal class Program
                 return node.Depth;
             }
 
-            AddJoltageButtonWiringsToQueue(searchNodes, node.Depth + 1, newState, targetState, buttonWirings, visitedNodes);
+            if (!visitedStates.Contains(newState))
+            {
+                AddJoltageButtonWiringsToQueue(searchNodes, node.Depth + 1, newState, targetState, buttonWirings);
+                visitedStates.Add(newState);
+            }
         }
 
         Console.WriteLine("Error: unable to find push count");
@@ -2114,43 +2126,23 @@ internal class Program
         int depth,
         JoltageRequirements currentState,
         JoltageRequirements targetState,
-        List<ButtonWiring> buttonWirings,
-        Dictionary<JoltageRequirements, HashSet<ButtonWiring>> visitedNodes)
+        List<ButtonWiring> buttonWirings)
     {
+        // Check whether any of the joltages in this state are already above the target
+        // If so, this node is invalid since the joltages can never go back down
+        for (int i = 0; i < currentState.Joltages.Count; i++)
+        {
+            if (currentState.Joltages[i] > targetState.Joltages[i])
+            {
+                //Console.WriteLine("Skipped node with overflowed state");
+                return;
+            }
+        }
+
         foreach (var buttonWiring in buttonWirings)
         {
-            // Check whether we've already explored this node
-            if (visitedNodes.TryGetValue(currentState, out var buttonWiringSet))
-            {
-                if (buttonWiringSet.Contains(buttonWiring))
-                {
-                    //Console.WriteLine("Skipped previously visited node!");
-                    continue;
-                }
-            }
-
-            // Check whether any of the joltages in this state are already above the target
-            // If so, this node is invalid since the joltages can never go back down
-            for (int i = 0; i < currentState.Joltages.Count; i++)
-            {
-                if (currentState.Joltages[i] > targetState.Joltages[i])
-                {
-                    //Console.WriteLine("Skipped node with overflowed state");
-                    continue;
-                }
-            }
-
             var node = new JoltageSearchNode { Depth = depth, CurrentState = currentState, ButtonWiring = buttonWiring };
             searchNodes.Enqueue(node);
-
-            if (!visitedNodes.ContainsKey(currentState))
-            {
-                visitedNodes.Add(currentState, new HashSet<ButtonWiring> { buttonWiring });
-            }
-            else
-            {
-                visitedNodes[currentState].Add(buttonWiring);
-            }
         }
     }
     #endregion
