@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace advent_of_code_2025;
 
@@ -1742,13 +1743,17 @@ internal class Program
         public string DebugString => string.Join(",", Buttons);
     }
 
-    public struct JoltageRequirements
+    public class JoltageRequirements : IEquatable<JoltageRequirements>
     {
-        public List<int> Joltages;
+        public IReadOnlyList<int> Joltages => _joltages;
+
+        private List<int> _joltages;
+        private int _hashCode = 0;
 
         public JoltageRequirements(List<int> joltages)
         {
-            Joltages = joltages;
+            _joltages = joltages;
+            _hashCode = ComputeHashCode();
         }
 
         public JoltageRequirements DeepCopy()
@@ -1759,6 +1764,11 @@ internal class Program
 
         public override int GetHashCode()
         {
+            return _hashCode;
+        }
+
+        private int ComputeHashCode()
+        {
             var hashCode = new HashCode();
             foreach (var item in Joltages)
             {
@@ -1767,12 +1777,16 @@ internal class Program
             return hashCode.ToHashCode();
         }
 
-        public void ApplyButtonPresses(ButtonWiring buttonWiring)
+        public override bool Equals(object? obj) => obj is JoltageRequirements other && Equals(other);
+
+        public static JoltageRequirements ApplyButtonPresses(JoltageRequirements initialState, ButtonWiring buttonWiring)
         {
+            var newJoltages = new List<int>(initialState.Joltages);
             foreach (var button in buttonWiring.Buttons)
             {
-                Joltages[button]++;
+                newJoltages[button]++;
             }
+            return new JoltageRequirements(newJoltages);
         }
 
         public bool Equals(JoltageRequirements other)
@@ -1981,11 +1995,6 @@ internal class Program
             //Console.WriteLine($"Dequeing. Queue size: {searchNodes.Count} -------------------------------------");
             var node = searchNodes.Dequeue();
 
-            if (searchNodes.Count % 10000 == 0)
-            {
-                Console.WriteLine($"Queue size: {searchNodes.Count}, current depth = {node.Depth}");
-            }
-
             //Console.WriteLine($"Testing node: {node.DebugString}");
 
             //Console.WriteLine($"... old state: {node.CurrentState.StateString}");
@@ -2050,30 +2059,35 @@ internal class Program
         Queue<JoltageSearchNode> searchNodes = new();
         AddJoltageButtonWiringsToQueue(searchNodes, 1, initialState, targetState, buttonWirings, visitedNodes);
 
+        Stopwatch totalStopwatch = new Stopwatch();
+        totalStopwatch.Start();
+        Stopwatch debugPrintStopwatch = new Stopwatch();
+        debugPrintStopwatch.Start();
+
+        var debugUpdateIntervalms = 1000;
+
         while (searchNodes.Count > 0)
         {
-            //Console.WriteLine($"Dequeing. Queue size: {searchNodes.Count} -------------------------------------");
             var node = searchNodes.Dequeue();
 
-            if (searchNodes.Count % 10000 == 0)
+            if (debugPrintStopwatch.ElapsedMilliseconds > debugUpdateIntervalms)
             {
                 Console.WriteLine($"Queue size: {searchNodes.Count}, current depth = {node.Depth}");
+                debugPrintStopwatch.Restart();
             }
 
-            //Console.WriteLine($"Testing node: {node.DebugString}");
-
-            //Console.WriteLine($"... old state: {node.CurrentState.StateString}");
-            var newState = node.CurrentState.DeepCopy();
-            newState.ApplyButtonPresses(node.ButtonWiring);
-            //Console.WriteLine($"... new state: {newState.StateString}");
+            var newState = JoltageRequirements.ApplyButtonPresses(node.CurrentState, node.ButtonWiring);
             if (newState.Equals(targetState))
             {
+                totalStopwatch.Stop();
+                Console.WriteLine($"Done. Total elapsed time: {totalStopwatch.Elapsed.TotalSeconds} seconds");
                 return node.Depth;
             }
+
             AddJoltageButtonWiringsToQueue(searchNodes, node.Depth + 1, newState, targetState, buttonWirings, visitedNodes);
         }
 
-        Console.WriteLine("Error: unable to find press count");
+        Console.WriteLine("Error: unable to find push count");
         return -1;
     }
 
@@ -2105,58 +2119,14 @@ internal class Program
     {
         foreach (var buttonWiring in buttonWirings)
         {
-            /*
-            if (depth <= 3)
-            {
-                Console.WriteLine("--------------------------------------");
-                Console.WriteLine($"currentState = {currentState.DebugString}, hash code = {currentState.GetHashCode()}");
-                Console.WriteLine($"current wiring: {buttonWiring.DebugString}, hash code = {buttonWiring.GetHashCode()}");
-                Console.WriteLine("visited nodes dict:");
-            }
-            */
-                foreach (var key in visitedNodes.Keys)
-                {
-                    //Console.WriteLine($"... {key.DebugString} {key.GetHashCode()}");
-                    if (key.GetHashCode() == currentState.GetHashCode())
-                    {
-                        //Console.WriteLine("KEY HASH CODE MATCH");
-                        var matchingValue = visitedNodes[key];
-                        //Console.WriteLine($"matching value: {matchingValue}");
-
-                        if (matchingValue.Contains(buttonWiring))
-                        {
-                            //Console.WriteLine("Skipped previously visited node???????????????????????????");
-                            continue;
-                        }
-                    }
-                }
-            
-
             // Check whether we've already explored this node
-            if (visitedNodes.ContainsKey(currentState))
+            if (visitedNodes.TryGetValue(currentState, out var buttonWiringSet))
             {
-                var buttonWiringSet = visitedNodes[currentState];
-
-                /*
-                if (depth <= 3)
-                {
-                    Console.WriteLine($"State key found!");
-                    Console.WriteLine("visited wirings:");
-                    foreach (var bw in buttonWiringSet)
-                    {
-                        Console.WriteLine($"... {bw.DebugString}, hash = {bw.GetHashCode()}");
-                    }
-                }
-                */
                 if (buttonWiringSet.Contains(buttonWiring))
                 {
-                    Console.WriteLine("Skipped previously visited node!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    //Console.WriteLine("Skipped previously visited node!");
                     continue;
                 }
-            }
-            else
-            {
-                if (depth <= 3) Console.WriteLine($"key not found");
             }
 
             // Check whether any of the joltages in this state are already above the target
