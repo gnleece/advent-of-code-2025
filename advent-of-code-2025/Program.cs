@@ -1772,14 +1772,14 @@ internal class Program
 
         public override bool Equals(object? obj) => obj is JoltageRequirements other && Equals(other);
 
-        public static JoltageRequirements ApplyButtonPresses(JoltageRequirements initialState, ButtonWiring buttonWiring)
+        public static JoltageRequirements ApplyButtonPresses(JoltageRequirements initialState, ButtonWiring buttonWiring, bool forward)
         {
             var newJoltages = new List<int>(initialState.Joltages);
             for (int i = 0; i < buttonWiring.Buttons.Length; i++)
             {
                 if (buttonWiring.Buttons[i] == 1)
                 {
-                    newJoltages[i]++;
+                    newJoltages[i] += forward ? 1 : -1;
                 }
             }
             return new JoltageRequirements(newJoltages);
@@ -1891,7 +1891,7 @@ internal class Program
 
     private static void Problem10Part2()
     {
-        var fileName = "../../../../input/input-10-example.txt";
+        var fileName = "../../../../input/input-10.txt";
         var lines = File.ReadLines(fileName).ToArray();
 
         if (lines.Count() == 0)
@@ -2066,10 +2066,12 @@ internal class Program
             return 0;
         }
 
-        HashSet<JoltageRequirements> visitedStates = new();
+        Dictionary<JoltageRequirements, int> forwardVisitedStates = new();
+        Dictionary<JoltageRequirements, int> backwardVisitedStates = new();
 
         Queue<JoltageSearchNode> searchNodes = new();
-        AddJoltageButtonWiringsToQueue(searchNodes, 1, initialState, targetState, buttonWirings);
+        AddJoltageButtonWiringsToQueue(searchNodes, 1, initialState, targetState, buttonWirings, true);
+        AddJoltageButtonWiringsToQueue(searchNodes, 1, targetState, initialState, buttonWirings, false);
 
         Stopwatch totalStopwatch = new Stopwatch();
         totalStopwatch.Start();
@@ -2084,22 +2086,43 @@ internal class Program
 
             if (debugPrintStopwatch.ElapsedMilliseconds > debugUpdateIntervalms)
             {
-                Console.WriteLine($"[Test {testCaseNumber}] Queue size: {searchNodes.Count}, current depth: {node.Depth}, elapsed time: {totalStopwatch.Elapsed.TotalSeconds}");
+                //Console.WriteLine($"[Test {testCaseNumber}] Queue size: {searchNodes.Count}, current depth: {node.Depth}, elapsed time: {totalStopwatch.Elapsed.TotalSeconds}");
+                var directionString = node.Forward ? "forward" : "backward";
+                Console.WriteLine($"... testing node with state {node.CurrentState.DebugString}, direction = {directionString}");
                 debugPrintStopwatch.Restart();
             }
 
-            var newState = JoltageRequirements.ApplyButtonPresses(node.CurrentState, node.ButtonWiring);
-            if (newState.Equals(targetState))
+            var newState = JoltageRequirements.ApplyButtonPresses(node.CurrentState, node.ButtonWiring, node.Forward);
+            if ((node.Forward && newState.Equals(targetState)) ||
+                (!node.Forward && newState.Equals(initialState)))
             {
                 totalStopwatch.Stop();
                 Console.WriteLine($"Done. Total elapsed time: {totalStopwatch.Elapsed.TotalSeconds} seconds");
                 return node.Depth;
             }
 
-            if (!visitedStates.Contains(newState))
+            if (node.Forward && backwardVisitedStates.TryGetValue(newState, out var backwardsDepth))
             {
-                AddJoltageButtonWiringsToQueue(searchNodes, node.Depth + 1, newState, targetState, buttonWirings);
-                visitedStates.Add(newState);
+                totalStopwatch.Stop();
+                Console.WriteLine($"Done. Total elapsed time: {totalStopwatch.Elapsed.TotalSeconds} seconds");
+                return node.Depth + backwardsDepth - 1;
+            }
+            else if (!node.Forward && forwardVisitedStates.TryGetValue(newState, out var forwardsDepth))
+            {
+                totalStopwatch.Stop();
+                Console.WriteLine($"Done. Total elapsed time: {totalStopwatch.Elapsed.TotalSeconds} seconds");
+                return node.Depth + forwardsDepth - 1;
+            }
+
+            if (node.Forward && !forwardVisitedStates.ContainsKey(newState))
+            {
+                AddJoltageButtonWiringsToQueue(searchNodes, node.Depth + 1, newState, targetState, buttonWirings, node.Forward);
+                forwardVisitedStates.Add(newState, node.Depth + 1);
+            }
+            else if (!node.Forward && !backwardVisitedStates.ContainsKey(newState))
+            {
+                AddJoltageButtonWiringsToQueue(searchNodes, node.Depth + 1, newState, initialState, buttonWirings, node.Forward);
+                backwardVisitedStates.Add(newState, node.Depth + 1);
             }
         }
 
@@ -2112,6 +2135,7 @@ internal class Program
         public int Depth;
         public JoltageRequirements CurrentState;
         public ButtonWiring ButtonWiring;
+        public bool Forward;
 
         public string DebugString
         {
@@ -2128,13 +2152,15 @@ internal class Program
         int depth,
         JoltageRequirements currentState,
         JoltageRequirements targetState,
-        List<ButtonWiring> buttonWirings)
+        List<ButtonWiring> buttonWirings,
+        bool forward)
     {
-        // Check whether any of the joltages in this state are already above the target
+        // Check whether any of the joltages in this state are already beyond the target
         // If so, this node is invalid since the joltages can never go back down
         for (int i = 0; i < currentState.Joltages.Count; i++)
         {
-            if (currentState.Joltages[i] > targetState.Joltages[i])
+            if ((forward && currentState.Joltages[i] > targetState.Joltages[i]) ||
+                !forward && currentState.Joltages[i] < targetState.Joltages[i])
             {
                 //Console.WriteLine("Skipped node with overflowed state");
                 return;
@@ -2143,7 +2169,7 @@ internal class Program
 
         foreach (var buttonWiring in buttonWirings)
         {
-            var node = new JoltageSearchNode { Depth = depth, CurrentState = currentState, ButtonWiring = buttonWiring };
+            var node = new JoltageSearchNode { Depth = depth, CurrentState = currentState, ButtonWiring = buttonWiring, Forward = forward };
             searchNodes.Enqueue(node);
         }
     }
