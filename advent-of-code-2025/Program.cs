@@ -1,6 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
-using static advent_of_code_2025.Program;
 
 namespace advent_of_code_2025;
 
