@@ -31,7 +31,7 @@ void Problem1Part1()
         
         // Remaining characters are the rotation distance
         std::string distanceString = line.substr(1);
-        int distance = atoi(distanceString.c_str());
+        int distance = stoi(distanceString);
         
         if (direction == 'L')
         {
@@ -89,7 +89,7 @@ void Problem1Part2()
         
         // Remaining characters are the rotation distance
         std::string distanceString = line.substr(1);
-        int distance = atoi(distanceString.c_str());
+        int distance = stoi(distanceString);
         
         int fullRotations = distance / dialSize;
         int remainderDistance = distance % dialSize;
