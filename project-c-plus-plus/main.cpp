@@ -8,5 +8,5 @@ void Problem2Part2();
 
 int main()
 {
-    Problem2Part1();
+    Problem2Part2();
 }

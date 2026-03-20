@@ -22,6 +22,36 @@ bool IsValidPart1(int64_t id)
 
 bool IsValidPart2(int64_t id)
 {
+    std::string idString = std::to_string(id);
+    size_t idStringLength = idString.length();
+    size_t maxPatternLength = idStringLength / 2;
+    
+    for (size_t patternLength = 1; patternLength <= maxPatternLength; patternLength++)
+    {
+        if (idStringLength % patternLength != 0)
+        {
+            continue;
+        }
+        
+        std::string pattern = idString.substr(0, patternLength);
+        size_t patternCount = idStringLength / patternLength;
+        bool allChunksMatchPattern = true;
+        for (size_t i = 1; i < patternCount; i++)
+        {
+            std::string currentChunk = idString.substr(i * patternLength, patternLength);
+            if (currentChunk != pattern)
+            {
+                allChunksMatchPattern = false;
+                break;
+            }
+        }
+        
+        if (allChunksMatchPattern)
+        {
+            return false;
+        }
+    }
+    
     return true;
 }
 
