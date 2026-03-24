@@ -4,24 +4,24 @@
 
 void Problem1Part1()
 {
-    std::string filePath = "Input/input-1.txt";
-    std::ifstream file (filePath);
+    std::string file_path = "Input/input-1.txt";
+    std::ifstream file (file_path);
     if (!file)
     {
-        std::cerr << "Could not open file " << filePath << '\n';
+        std::cerr << "Could not open file " << file_path << '\n';
         return;
     }
     
-    int dialPosition = 50;
-    int dialSize = 100;
-    int zeroCounter = 0;
+    int dial_position = 50;
+    int dial_size = 100;
+    int zero_counter = 0;
     
     std::string line;
     while (std::getline(file, line))
     {
         if (line.empty())
         {
-            std::cerr << "Found empty line in" << filePath << ", skipping" << '\n';
+            std::cerr << "Found empty line in" << file_path << ", skipping" << '\n';
             continue;
         }
         std::cout << line << '\n';
@@ -30,97 +30,96 @@ void Problem1Part1()
         char direction = line[0];
         
         // Remaining characters are the rotation distance
-        std::string distanceString = line.substr(1);
-        int distance = stoi(distanceString);
+        std::string distance_string = line.substr(1);
+        int distance = stoi(distance_string);
         
         if (direction == 'L')
         {
-            dialPosition -= distance;
-            while (dialPosition < 0)
+            dial_position -= distance;
+            while (dial_position < 0)
             {
-                dialPosition += dialSize;
+                dial_position += dial_size;
             }
-            dialPosition = dialPosition % dialSize;
+            dial_position = dial_position % dial_size;
         }
         else if (direction == 'R')
         {
-            dialPosition += distance;
-            dialPosition = dialPosition % dialSize;
+            dial_position += distance;
+            dial_position = dial_position % dial_size;
         }
         
-        if (dialPosition == 0)
+        if (dial_position == 0)
         {
-            zeroCounter++;
+            zero_counter++;
         }
     }
     
-    std::cout << "Zero count: " << zeroCounter << '\n';
+    std::cout << "Zero count: " << zero_counter << '\n';
 }
 
 void Problem1Part2()
 {
-    std::string filePath = "Input/input-1.txt";
-    std::ifstream file (filePath);
+    std::string file_path = "Input/input-1.txt";
+    std::ifstream file (file_path);
     if (!file)
     {
-        std::cerr << "Could not open file " << filePath << '\n';
+        std::cerr << "Could not open file " << file_path << '\n';
         return;
     }
     
-    int dialPosition = 50;
-    int dialSize = 100;
-    int zeroCounter = 0;
+    int dial_position = 50;
+    int dial_size = 100;
+    int zero_counter = 0;
     
     std::string line;
     while (std::getline(file, line))
     {
         if (line.empty())
         {
-            std::cerr << "Found empty line in" << filePath << ", skipping" << '\n';
+            std::cerr << "Found empty line in" << file_path << ", skipping" << '\n';
             continue;
         }
         std::cout << line << '\n';
         
-        int previousPosition = dialPosition;
-        
+        int previous_position = dial_position;
         
         // First character of the line indicates direction
         char direction = line[0];
         
         // Remaining characters are the rotation distance
-        std::string distanceString = line.substr(1);
-        int distance = stoi(distanceString);
+        std::string distance_string = line.substr(1);
+        int distance = stoi(distance_string);
         
-        int fullRotations = distance / dialSize;
-        int remainderDistance = distance % dialSize;
+        int full_rotations = distance / dial_size;
+        int remainder_distance = distance % dial_size;
         
         if (direction == 'L')
         {
-            dialPosition -= remainderDistance;
-            if (dialPosition <= 0 &&
-                previousPosition > 0)  // Edge case where dial is already at 0 and moves left doesn't count as a click
+            dial_position -= remainder_distance;
+            if (dial_position <= 0 &&
+                previous_position > 0)  // Edge case where dial is already at 0 and moves left doesn't count as a click
             {
-                zeroCounter++;
+                zero_counter++;
             }
             
-            while (dialPosition < 0)
+            while (dial_position < 0)
             {
-                dialPosition += dialSize;
+                dial_position += dial_size;
             }
         }
         else if (direction == 'R')
         {
-            dialPosition += remainderDistance;
-            if (dialPosition >= dialSize)
+            dial_position += remainder_distance;
+            if (dial_position >= dial_size)
             {
-                zeroCounter++;
+                zero_counter++;
             }
         }
         
-        dialPosition = dialPosition % dialSize;
+        dial_position = dial_position % dial_size;
         
-        zeroCounter += fullRotations;
+        zero_counter += full_rotations;
     }
     
-    std::cout << "Zero count: " << zeroCounter << '\n';
+    std::cout << "Zero count: " << zero_counter << '\n';
 }
