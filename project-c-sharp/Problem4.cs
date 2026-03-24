@@ -74,6 +74,7 @@ internal partial class Program
 
         var lineLength = lines.First().Length;
         var lineCount = lines.Count();
+        
         bool[,] rollGrid = new bool[lineCount, lineLength];
         Console.WriteLine($"Line length:{lineLength}, line count: {lineCount} ");
 

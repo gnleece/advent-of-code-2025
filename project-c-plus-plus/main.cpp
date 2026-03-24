@@ -7,8 +7,9 @@ void Problem2Part1();
 void Problem2Part2();
 void Problem3Part1();
 void Problem3Part2();
+void Problem4Part1();
 
 int main()
 {
-    Problem3Part2();
+    Problem4Part1();
 }
